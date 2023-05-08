@@ -154,3 +154,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute=0),
     },
 }
+import sys
+if 'runserver' in sys.argv:
+    import subprocess
+    subprocess.Popen(['python', 'create_admin.py'])

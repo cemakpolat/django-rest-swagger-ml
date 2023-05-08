@@ -1,7 +1,84 @@
 version: '3'
+volumes:
+  django_gateway:
+  celery_gateway:
+  mysql_data:
+  sensor:
+
 services:
+  django:
+    build:
+      context: .
+      dockerfile: django.Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+    env_file:
+      - .env
+    command: >
+            sh -c "
+            sleep 10 &&
+            python manage.py makemigrations &&
+            python manage.py migrate && 
+            python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - django_gateway:/app
+    networks:
+      - test-network
+
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: 'gateway'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - test-network
+  sensor:
+    build:
+      context: .
+      dockerfile: sensor.Dockerfile
+    depends_on:
+      - django
+    env_file:
+      - .env
+    command: >
+            sh -c "
+            sleep 15 &&
+            python sensor.py"
+    volumes:
+      - sensor:/app
+
+  celery:
+    build:
+      context: .
+      dockerfile: django.Dockerfile
+    depends_on:
+      - mysql
+      - redis
+    env_file:
+      - .env
+    command: >
+            sh -c "
+            sleep 10 &&
+            python manage.py makemigrations &&
+            python manage.py migrate && 
+            celery -A iot worker -l info"
+    volumes:
+      - celery_gateway:/app
+
   redis:
     image: redis:latest
-    restart: always
     ports:
       - "6379:6379"
+
+
+networks:
+  test-network:
+    driver: bridge
